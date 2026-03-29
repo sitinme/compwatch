@@ -1,30 +1,23 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { diffWords } from 'diff';
 
 export interface ChangeAnalysis {
-  summary: string;        // 2-3 sentence summary
+  summary: string;
   category: 'pricing' | 'feature' | 'content' | 'seo' | 'design' | 'other';
   importance: 'critical' | 'important' | 'medium' | 'minor';
-  insight: string;        // Business insight / what it means
-  changes: string[];      // Bullet points of specific changes
+  insight: string;
+  changes: string[];
 }
 
-// Pre-process diff to filter out noise
 function preprocessDiff(oldText: string, newText: string): string {
   const changes = diffWords(oldText, newText);
   const meaningful: string[] = [];
 
   for (const part of changes) {
     if (!part.added && !part.removed) continue;
-
     const text = part.value.trim();
-    // Skip very short changes (likely whitespace/formatting)
     if (text.length < 5) continue;
-    // Skip timestamp-like patterns
     if (/^\d{4}[-/]\d{2}[-/]\d{2}/.test(text)) continue;
-    // Skip pure numbers (counters, dates)
     if (/^\d+$/.test(text)) continue;
-
     const prefix = part.added ? '[ADDED]' : '[REMOVED]';
     meaningful.push(`${prefix} ${text}`);
   }
@@ -65,14 +58,16 @@ export async function analyzeChange(
   oldText: string,
   newText: string,
 ): Promise<ChangeAnalysis> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.AI_API_KEY;
+  const baseUrl = process.env.AI_BASE_URL || 'https://api.aigocode.com';
+  const model = process.env.AI_MODEL || 'claude-sonnet-4-6';
+
   if (!apiKey) {
-    // Return a basic analysis without AI
     return {
       summary: `Changes detected on ${new URL(url).hostname}. AI analysis requires API key.`,
       category: 'other',
       importance: 'medium',
-      insight: 'Configure ANTHROPIC_API_KEY for AI-powered analysis.',
+      insight: 'Configure AI_API_KEY for AI-powered analysis.',
       changes: ['Content has been modified'],
     };
   }
@@ -89,22 +84,33 @@ export async function analyzeChange(
     };
   }
 
-  const client = new Anthropic({ apiKey });
-
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [{
-      role: 'user',
-      content: `URL: ${url}\n\nChanges detected:\n${diff.slice(0, 4000)}`,
-    }],
+  // OpenAI-compatible API call
+  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `URL: ${url}\n\nChanges detected:\n${diff.slice(0, 4000)}` },
+      ],
+      max_tokens: 1024,
+      temperature: 0.3,
+    }),
   });
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`AI API error ${response.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || '';
 
   try {
-    // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON in response');
     return JSON.parse(jsonMatch[0]) as ChangeAnalysis;

@@ -1,6 +1,3 @@
-// Database schema for CompWatch
-// Using better-sqlite3 for local dev, can migrate to D1 for production
-
 export const SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -13,17 +10,34 @@ export const SCHEMA = `
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS magic_links (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS monitors (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
     url TEXT NOT NULL,
     name TEXT,
-    check_interval INTEGER DEFAULT 86400,  -- seconds, default 24h
+    check_interval INTEGER DEFAULT 86400,
     last_checked_at DATETIME,
     last_changed_at DATETIME,
+    change_count INTEGER DEFAULT 0,
     status TEXT DEFAULT 'active' CHECK(status IN ('active', 'paused', 'error')),
     error_message TEXT,
-    scrape_layer INTEGER DEFAULT 1,  -- 1=HTTP, 2=Playwright, 3=Proxy
+    scrape_layer INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -42,7 +56,7 @@ export const SCHEMA = `
     snapshot_after_id TEXT NOT NULL REFERENCES snapshots(id),
     diff_text TEXT NOT NULL,
     ai_summary TEXT,
-    ai_category TEXT,  -- pricing, feature, content, seo
+    ai_category TEXT,
     ai_importance TEXT DEFAULT 'medium' CHECK(ai_importance IN ('critical', 'important', 'medium', 'minor')),
     ai_insight TEXT,
     notified_at DATETIME,
@@ -57,6 +71,8 @@ export const SCHEMA = `
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+  CREATE INDEX IF NOT EXISTS idx_magic_token ON magic_links(token);
   CREATE INDEX IF NOT EXISTS idx_monitors_user ON monitors(user_id);
   CREATE INDEX IF NOT EXISTS idx_snapshots_monitor ON snapshots(monitor_id);
   CREATE INDEX IF NOT EXISTS idx_changes_monitor ON changes(monitor_id);

@@ -18,6 +18,7 @@ export default function Header() {
           <Link href="/pricing" className="hover:text-[--color-primary]">Pricing</Link>
           <Link href="/blog" className="hover:text-[--color-primary]">Blog</Link>
           <Link href="/about" className="hover:text-[--color-primary]">About</Link>
+          <Link href="/login" className="hover:text-[--color-primary]">Sign In</Link>
           <Link href="/dashboard" className="px-4 py-2 bg-[--color-primary] text-white rounded-lg hover:bg-[--color-primary-dark] font-semibold">Dashboard →</Link>
         </nav>
         <button className="md:hidden p-2" onClick={() => setOpen(!open)}>
@@ -29,6 +30,7 @@ export default function Header() {
           <Link href="/pricing" className="block text-gray-700" onClick={() => setOpen(false)}>Pricing</Link>
           <Link href="/blog" className="block text-gray-700" onClick={() => setOpen(false)}>Blog</Link>
           <Link href="/about" className="block text-gray-700" onClick={() => setOpen(false)}>About</Link>
+          <Link href="/login" className="block text-gray-700" onClick={() => setOpen(false)}>Sign In</Link>
           <Link href="/dashboard" className="block bg-[--color-primary] text-white text-center rounded-lg py-2 font-semibold" onClick={() => setOpen(false)}>Dashboard →</Link>
         </div>
       )}
